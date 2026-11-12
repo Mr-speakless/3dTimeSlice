@@ -106,7 +106,7 @@ export default function App() {
   const [contours, setContours] = useState(false)
   const [showMap, setShowMap] = useState(true)
   const [follow, setFollow] = useState(false)
-  const [fade, setFade] = useState(true)
+  const [fade, setFade] = useState(false)
 
   useEffect(() => {
     const api = createScene(canvasRef.current!, stageRef.current!, mapRef.current!, {

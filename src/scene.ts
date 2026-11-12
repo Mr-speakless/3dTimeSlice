@@ -82,7 +82,7 @@ export function createScene(canvas: HTMLCanvasElement, stage: HTMLElement, mapCa
   const hw = () => (c * LOOP) / 2
   const play = { on: false, dir: 1, speed: 1, mode: 'loop' }
   let follow = false   // false: the camera keeps its place in the room · true: it rides the slice along its normal
-  let fade = true      // objects turn translucent as the tilt approaches 90°
+  let fade = false     // objects turn translucent as the tilt approaches 90° (off unless asked for)
   const tiltDeg = () => THREE.MathUtils.radToDeg(Math.acos(Math.max(-1, Math.min(1, slice.cos))))
   minimap.build(c)
 
