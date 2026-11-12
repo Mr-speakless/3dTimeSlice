@@ -186,7 +186,7 @@ export default function App() {
           </CardContent>
         </Card>
 
-        <Section title="Slice" hint="Tilting turns the slice about where and when you are standing.">
+        <Section title="Slice" hint="Three angles turn the slice about where and when you are standing. Position moves it along its own normal — the one direction you cannot walk in.">
           <Field label="Tilt towards X" htmlFor="ax" right={
             <NumField value={slice.ax} min={-180} max={180} step={0.1} decimals={1} suffix="°" onCommit={(v) => scene().setSlice({ ax: v })} />}>
             <Slider id="ax" min={-180} max={180} step={0.5} value={[slice.ax]} onValueChange={(v) => scene().setSlice({ ax: first(v) })} />
@@ -199,7 +199,7 @@ export default function App() {
             <NumField value={slice.az} min={-90} max={90} step={0.1} decimals={1} suffix="°" onCommit={(v) => scene().setSlice({ az: v })} />}>
             <Slider id="az" min={-90} max={90} step={0.5} value={[slice.az]} onValueChange={(v) => scene().setSlice({ az: first(v) })} />
           </Field>
-          <Field label={follow ? 'Position' : 'Position (your moment)'} htmlFor="pos" right={
+          <Field label="Position" htmlFor="pos" right={
             <NumField value={slice.pos} min={-1} max={1} step={0.001} decimals={3} onCommit={(v) => scene().setSlice({ pos: v })} />}>
             <Slider id="pos" min={-1} max={1} step={0.001} value={[slice.pos]} onValueChange={(v) => scene().setSlice({ pos: first(v) })} />
           </Field>

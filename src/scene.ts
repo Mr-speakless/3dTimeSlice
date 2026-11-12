@@ -116,8 +116,7 @@ export function createScene(canvas: HTMLCanvasElement, stage: HTMLElement, mapCa
   function emit(now: number, force = false) {
     if (!force && (!dirty || now - lastEmit < 50)) return
     dirty = false; lastEmit = now
-    // following: how far the slice sits along its normal. staying put: where in the loop your own moment is.
-    const pos = follow ? offset(slice, cam) / reach(slice, walkable, hw()) : wrapW(cam.w, hw()) / hw()
+    const pos = offset(slice, cam) / reach(slice, walkable, hw())   // how far the slice sits along its normal
     handlers.onSlice?.({
       ...angles,
       pos: Math.max(-1, Math.min(1, pos)),
@@ -277,9 +276,20 @@ export function createScene(canvas: HTMLCanvasElement, stage: HTMLElement, mapCa
         cam = { x: cam.x, w: wrapW(cam.w, hw()) }
       }
       if (p.pos !== undefined) {
-        cam = follow
-          ? alongNormal(slice, cam, p.pos * reach(slice, walkable, hw()) - offset(slice, cam))
-          : { x: cam.x, w: p.pos * hw() }
+        // Position is the slice's fourth degree of freedom: how far along its own normal it sits.
+        const delta = p.pos * reach(slice, walkable, hw()) - offset(slice, cam)
+        cam = alongNormal(slice, cam, delta)
+        if (!follow) {
+          // Staying put: slide back inside the slice to where you stood, so only your moment changes.
+          // That costs 1/cos of time per metre, and at 90° it cannot be done at all — there the slice
+          // is a wall crossing the room and moving it has to move you — so ease it out as cos → 0.
+          const ac = Math.abs(slice.cos)
+          const keep = THREE.MathUtils.smoothstep(ac, 0.1, 0.35)
+          if (keep > 0) {
+            const back = (-keep * slice.sin * delta) / slice.cos
+            cam = embed(slice, cam, [slice.a[0] * back, slice.a[1] * back, slice.a[2] * back])
+          }
+        }
       }
       settle()
       emit(performance.now(), true)
