@@ -9,6 +9,8 @@ With no tilt the slice is the room at one instant, and playing moves it forward 
 - Click the view to look around, `W A S D` or arrow keys to walk, `Q` / `E` down / up, `Shift` faster, `Esc` to release the mouse
 - `Space` play / pause
 - The panel on the right tilts the slice towards X, Y and Z, moves it along its normal, and sets how many metres one second is worth
+- **Follow the slice** — off (default): you keep your place in the room and your own moment runs at normal speed. On: you ride the slice as it moves along its normal, which at 90° sweeps you across the room
+- **Fade objects past 85°** — objects turn translucent over the last few degrees, so the tubes they become can be seen through
 - The small spacetime map drops height and draws floor plan × time; the green plane is the slice you are standing in
 
 ## How it works

@@ -12,6 +12,8 @@ const RUN = 2.5           // multiplier while Shift is held
 const LOOK = 0.0022       // radians per pixel of mouse travel
 const BODY = 0.3          // how close the camera may get to a wall or an object, metres
 const MAX_PIXEL_RATIO = 1.5
+const FADE_FROM = 85      // tilt (degrees) past which objects start turning translucent …
+const FADE_MIN = 0.3      // … and how opaque they still are at 90°
 const START: Event4 = { x: [-1.5, -0.4, 3.3], w: 0 }  // eye height 1.6 m, half-way through the loop
 const START_YAW = -0.4                               // turned a little towards the middle of the room
 export const DEFAULT_TIME_SCALE = 1                 // metres of the time axis per second
@@ -57,6 +59,9 @@ export function createScene(canvas: HTMLCanvasElement, stage: HTMLElement, mapCa
     uAspect: { value: 1 },
     uRoom: { value: new THREE.Vector3(...ROOM) },
     uContours: { value: 0 },
+    uAlpha: { value: 1 },
+    uMaxDist: { value: 90 },
+    uPix: { value: 0.002 },
   }
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ vertexShader, fragmentShader, uniforms, depthTest: false }))
   quad.frustumCulled = false
@@ -76,6 +81,9 @@ export function createScene(canvas: HTMLCanvasElement, stage: HTMLElement, mapCa
   const walkable: Vec3 = [ROOM[0] - BODY, ROOM[1] - BODY, ROOM[2] - BODY]
   const hw = () => (c * LOOP) / 2
   const play = { on: false, dir: 1, speed: 1, mode: 'loop' }
+  let follow = false   // false: the camera keeps its place in the room · true: it rides the slice along its normal
+  let fade = true      // objects turn translucent as the tilt approaches 90°
+  const tiltDeg = () => THREE.MathUtils.radToDeg(Math.acos(Math.max(-1, Math.min(1, slice.cos))))
   minimap.build(c)
 
   /** Slide the camera out of any object it is inside of, staying within the slice. */
@@ -108,12 +116,13 @@ export function createScene(canvas: HTMLCanvasElement, stage: HTMLElement, mapCa
   function emit(now: number, force = false) {
     if (!force && (!dirty || now - lastEmit < 50)) return
     dirty = false; lastEmit = now
-    const R = reach(slice, walkable, hw())
+    // following: how far the slice sits along its normal. staying put: where in the loop your own moment is.
+    const pos = follow ? offset(slice, cam) / reach(slice, walkable, hw()) : wrapW(cam.w, hw()) / hw()
     handlers.onSlice?.({
       ...angles,
-      pos: Math.max(-1, Math.min(1, offset(slice, cam) / R)),
+      pos: Math.max(-1, Math.min(1, pos)),
       normal: slice.n,
-      tilt: THREE.MathUtils.radToDeg(Math.acos(Math.max(-1, Math.min(1, slice.cos)))),
+      tilt: tiltDeg(),
       time: (((wrapW(cam.w, hw()) + hw()) / c) % LOOP + LOOP) % LOOP,
     })
   }
@@ -165,6 +174,7 @@ export function createScene(canvas: HTMLCanvasElement, stage: HTMLElement, mapCa
     if (!w || !h) return
     renderer.setSize(w, h, false)
     uniforms.uAspect.value = w / h
+    uniforms.uPix.value = (2 * uniforms.uTanFov.value) / (h * renderer.getPixelRatio())   // angle one pixel covers
   }
   const ro = new ResizeObserver(resize)
   ro.observe(stage)
@@ -191,8 +201,21 @@ export function createScene(canvas: HTMLCanvasElement, stage: HTMLElement, mapCa
       dirty = true
     }
 
-    // play: the whole slice — camera included — moves along its own normal.
-    if (play.on) {
+    // play, staying put: you keep your place in the room and your own moment runs at 1×. The slice still
+    // moves along its normal, by exactly as much as that takes (cos θ of it — nothing at all at 90°, where
+    // time has become a direction inside the slice and this simply carries you along it).
+    if (play.on && !follow) {
+      const sgn = slice.cos >= 0 ? 1 : -1
+      let w = cam.w + play.dir * sgn * c * play.speed * dt
+      if (play.mode === 'pingpong') {
+        if (Math.abs(w) > hw()) { w = Math.sign(w) * hw(); play.dir = -play.dir }
+      } else w = wrapW(w, hw())
+      cam = { x: cam.x, w }
+      dirty = true
+    }
+
+    // play, following: the whole slice — camera included — moves along its own normal.
+    if (play.on && follow) {
       const R = reach(slice, walkable, hw())
       const step = play.dir * c * play.speed * dt
       const d = offset(slice, cam) + step
@@ -228,6 +251,10 @@ export function createScene(canvas: HTMLCanvasElement, stage: HTMLElement, mapCa
     uniforms.uSin.value = slice.sin
     uniforms.uC.value = c
     uniforms.uLip.value = 1 + (slice.sin * V_MAX) / c
+    uniforms.uMaxDist.value = Math.max(90, 1.6 * c * LOOP)   // always far enough to see a whole loop down the time axis
+    // objects thin out over the last few degrees before the slice is fully space-like
+    const fromFlat = 90 - Math.abs(90 - tiltDeg())
+    uniforms.uAlpha.value = fade ? 1 - (1 - FADE_MIN) * THREE.MathUtils.smoothstep(fromFlat, FADE_FROM, 90) : 1
     renderer.render(scene, dummyCamera)
 
     if (mapVisible) {
@@ -249,7 +276,11 @@ export function createScene(canvas: HTMLCanvasElement, stage: HTMLElement, mapCa
         slice = makeSlice(angles)
         cam = { x: cam.x, w: wrapW(cam.w, hw()) }
       }
-      if (p.pos !== undefined) cam = alongNormal(slice, cam, p.pos * reach(slice, walkable, hw()) - offset(slice, cam))
+      if (p.pos !== undefined) {
+        cam = follow
+          ? alongNormal(slice, cam, p.pos * reach(slice, walkable, hw()) - offset(slice, cam))
+          : { x: cam.x, w: p.pos * hw() }
+      }
       settle()
       emit(performance.now(), true)
     },
@@ -275,6 +306,14 @@ export function createScene(canvas: HTMLCanvasElement, stage: HTMLElement, mapCa
       emit(performance.now(), true)
     },
     setContours(on: boolean) { uniforms.uContours.value = on ? 1 : 0 },
+    /** Whether the camera rides the slice along its normal, or keeps its place in the room. */
+    setFollow(on: boolean) {
+      follow = on
+      play.dir = 1
+      cam = { x: cam.x, w: wrapW(cam.w, hw()) }
+      emit(performance.now(), true)
+    },
+    setFade(on: boolean) { fade = on },
     setMapVisible(on: boolean) { mapVisible = on },
     releasePointer() { if (locked()) document.exitPointerLock() },
     dispose() {

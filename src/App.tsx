@@ -105,6 +105,8 @@ export default function App() {
   const [timeScale, setTimeScale] = useState(DEFAULT_TIME_SCALE)
   const [contours, setContours] = useState(false)
   const [showMap, setShowMap] = useState(true)
+  const [follow, setFollow] = useState(false)
+  const [fade, setFade] = useState(true)
 
   useEffect(() => {
     const api = createScene(canvasRef.current!, stageRef.current!, mapRef.current!, {
@@ -197,10 +199,17 @@ export default function App() {
             <NumField value={slice.az} min={-90} max={90} step={0.1} decimals={1} suffix="°" onCommit={(v) => scene().setSlice({ az: v })} />}>
             <Slider id="az" min={-90} max={90} step={0.5} value={[slice.az]} onValueChange={(v) => scene().setSlice({ az: first(v) })} />
           </Field>
-          <Field label="Position" htmlFor="pos" right={
+          <Field label={follow ? 'Position' : 'Position (your moment)'} htmlFor="pos" right={
             <NumField value={slice.pos} min={-1} max={1} step={0.001} decimals={3} onCommit={(v) => scene().setSlice({ pos: v })} />}>
             <Slider id="pos" min={-1} max={1} step={0.001} value={[slice.pos]} onValueChange={(v) => scene().setSlice({ pos: first(v) })} />
           </Field>
+        </Section>
+
+        <Section title="Camera" hint={follow
+          ? 'You ride the slice: as it moves along its normal it carries you through the room.'
+          : 'You keep your place in the room and your own moment runs at normal speed.'}>
+          <Field label="Follow the slice" htmlFor="follow" right={
+            <Switch id="follow" checked={follow} onCheckedChange={(on) => { setFollow(on); scene().setFollow(on) }} />} />
         </Section>
 
         <Section title="Presets">
@@ -213,7 +222,7 @@ export default function App() {
           </div>
         </Section>
 
-        <Section title="Playback" hint="Playing moves the slice along its own normal.">
+        <Section title="Playback" hint={follow ? 'Playing moves the slice along its own normal at a steady speed.' : 'Playing moves the slice along its own normal, just fast enough for your moment to run at this speed.'}>
           <div className="grid grid-cols-2 gap-2.5">
             <Button variant="secondary" onClick={() => scene().togglePlaying()}>
               {playing ? <Pause /> : <Play />} {playing ? 'Pause' : 'Play'}
@@ -232,10 +241,12 @@ export default function App() {
 
         <Section title="Display">
           <Field label="Time scale" right={<span className={valueCls}>1 s = {timeScale.toFixed(2)} m</span>}>
-            <Slider min={0.5} max={4} step={0.05} value={[timeScale]} onValueChange={(v) => { setTimeScale(first(v)); scene().setTimeScale(first(v)) }} />
+            <Slider min={0.5} max={12} step={0.1} value={[timeScale]} onValueChange={(v) => { setTimeScale(first(v)); scene().setTimeScale(first(v)) }} />
           </Field>
           <Field label="Time contours" htmlFor="contours" right={
             <Switch id="contours" checked={contours} onCheckedChange={(on) => { setContours(on); scene().setContours(on) }} />} />
+          <Field label="Fade objects past 85°" htmlFor="fade" right={
+            <Switch id="fade" checked={fade} onCheckedChange={(on) => { setFade(on); scene().setFade(on) }} />} />
           <Field label="Spacetime map" htmlFor="map" right={
             <Switch id="map" checked={showMap} onCheckedChange={(on) => { setShowMap(on); scene().setMapVisible(on) }} />} />
         </Section>
